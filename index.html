@@ -304,11 +304,11 @@ tailwind.config = {
     <div class="space-y-3">
       <div>
         <label class="text-xs font-semibold text-on-surface-variant">Nama Lengkap</label>
-        <p id="surat-izin-nama" class="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container text-sm font-medium"></p>
+        <input id="surat-izin-nama" type="text" class="w-full mt-1 px-3 py-2 rounded-lg border border-outline-variant text-sm font-medium focus:border-primary outline-none"/>
       </div>
       <div>
         <label class="text-xs font-semibold text-on-surface-variant">Kelas / Program</label>
-        <p id="surat-izin-kelas" class="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container text-sm font-medium"></p>
+        <input id="surat-izin-kelas" type="text" class="w-full mt-1 px-3 py-2 rounded-lg border border-outline-variant text-sm font-medium focus:border-primary outline-none"/>
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
@@ -327,11 +327,11 @@ tailwind.config = {
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="text-xs font-semibold text-on-surface-variant">Tgl Berangkat</label>
-          <p id="surat-izin-berangkat" class="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container text-sm font-medium"></p>
+          <input id="surat-izin-berangkat" type="text" class="w-full mt-1 px-3 py-2 rounded-lg border border-outline-variant text-sm font-medium focus:border-primary outline-none"/>
         </div>
         <div>
           <label class="text-xs font-semibold text-on-surface-variant">Tgl Kembali</label>
-          <p id="surat-izin-kembali" class="w-full mt-1 px-3 py-2 rounded-lg bg-surface-container text-sm font-medium"></p>
+          <input id="surat-izin-kembali" type="text" class="w-full mt-1 px-3 py-2 rounded-lg border border-outline-variant text-sm font-medium focus:border-primary outline-none"/>
         </div>
       </div>
       <div>
@@ -3927,8 +3927,8 @@ async function addVisitRequest({ studentId, day, time, keperluan, requestedBy })
   await saveDB();
 }
 
-async function addIzinRequest({ studentId, keperluan, startDate, endDate, requestedBy }){
-  DB.izinRequests.push({ id: uid("izn"), studentId, keperluan, startDate, endDate, requestedBy, status: "pending", createdAt: todayISO() });
+async function addIzinRequest({ studentId, keperluan, startDate, endDate, requestedBy, jemput, waPenjemput }){
+  DB.izinRequests.push({ id: uid("izn"), studentId, keperluan, startDate, endDate, requestedBy, jemput: jemput || "", waPenjemput: waPenjemput || "", status: "pending", createdAt: todayISO() });
   notifyIzinEmail(studentById(studentId), keperluan, startDate, endDate, requestedBy);
   await saveDB();
 }
@@ -4807,16 +4807,17 @@ function openSuratIzinModal(izinId){
   const isFromParent = (r.requestedBy||"").toLowerCase().startsWith("orang tua");
 
   document.getElementById("surat-izin-id").value = r.id;
-  document.getElementById("surat-izin-nama").textContent = s ? s.name : "(siswa dihapus)";
-  document.getElementById("surat-izin-kelas").textContent = s ? (s.kelas || "-") : "-";
+  document.getElementById("surat-izin-nama").value = r.suratNama !== undefined ? r.suratNama : (s ? s.name : "(siswa dihapus)");
+  document.getElementById("surat-izin-kelas").value = r.suratKelas !== undefined ? r.suratKelas : (s ? (s.kelas || "-") : "-");
   document.getElementById("surat-izin-lampiran").value = r.suratLampiran !== undefined ? r.suratLampiran : "-";
   document.getElementById("surat-izin-perihal").value = r.suratPerihal !== undefined ? r.suratPerihal : "Izin Pulang Santri";
   document.getElementById("surat-izin-alasan").value = r.keperluan || "";
-  document.getElementById("surat-izin-berangkat").textContent = `${dayNameID(r.startDate)}, ${formatDate(r.startDate)}`;
-  document.getElementById("surat-izin-kembali").textContent = `${dayNameID(r.endDate)}, ${formatDate(r.endDate)}`;
+  document.getElementById("surat-izin-berangkat").value = r.suratBerangkat !== undefined ? r.suratBerangkat : `${dayNameID(r.startDate)}, ${formatDate(r.startDate)}`;
+  document.getElementById("surat-izin-kembali").value = r.suratKembali !== undefined ? r.suratKembali : `${dayNameID(r.endDate)}, ${formatDate(r.endDate)}`;
   document.getElementById("surat-izin-sumber").value = isFromParent ? "orangtua" : "santri";
-  document.getElementById("surat-izin-jemput").value = isFromParent ? "Orang tua / Wali santri" : "";
-  document.getElementById("surat-izin-wa").value = r.suratWaPenjemput || "";
+  // Kolom penjemputan diisi santri lewat menu "Ajukan Izin"; guru tetap bisa mengubahnya di sini.
+  document.getElementById("surat-izin-jemput").value = r.jemput || (isFromParent ? "Orang tua / Wali santri" : "");
+  document.getElementById("surat-izin-wa").value = r.waPenjemput || r.suratWaPenjemput || "";
 
   document.getElementById("surat-izin-modal").classList.remove("hidden");
   document.getElementById("surat-izin-modal").classList.add("flex");
@@ -4880,12 +4881,18 @@ async function collectSuratIzinData(){
   const sumber = document.getElementById("surat-izin-sumber").value; // 'santri' | 'orangtua'
   const jemput = document.getElementById("surat-izin-jemput").value.trim() || "-";
   const waPenjemput = document.getElementById("surat-izin-wa").value.trim() || "-";
-  r.suratWaPenjemput = document.getElementById("surat-izin-wa").value.trim();
+  r.jemput = document.getElementById("surat-izin-jemput").value.trim();
+  r.waPenjemput = document.getElementById("surat-izin-wa").value.trim();
+  r.suratWaPenjemput = r.waPenjemput;
 
-  const namaSantri = s ? s.name : "-";
-  const kelasSantri = s ? (s.kelas || "-") : "-";
-  const tglBerangkat = `${dayNameID(r.startDate)}, ${formatDate(r.startDate)}`;
-  const tglKembali = `${dayNameID(r.endDate)}, ${formatDate(r.endDate)}`;
+  const namaSantri = document.getElementById("surat-izin-nama").value.trim() || (s ? s.name : "-");
+  const kelasSantri = document.getElementById("surat-izin-kelas").value.trim() || (s ? (s.kelas || "-") : "-");
+  const tglBerangkat = document.getElementById("surat-izin-berangkat").value.trim() || `${dayNameID(r.startDate)}, ${formatDate(r.startDate)}`;
+  const tglKembali = document.getElementById("surat-izin-kembali").value.trim() || `${dayNameID(r.endDate)}, ${formatDate(r.endDate)}`;
+  r.suratNama = namaSantri;
+  r.suratKelas = kelasSantri;
+  r.suratBerangkat = tglBerangkat;
+  r.suratKembali = tglKembali;
 
   const now = new Date();
   const nomorUrut = await getOrAssignNomorSurat(r);
@@ -7154,6 +7161,16 @@ function renderStudentIzin(){
           <input id="student-izin-end" type="date" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:border-primary outline-none"/>
         </div>
       </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1">Dijemput / Diantar Oleh</label>
+          <input id="student-izin-jemput" type="text" placeholder="cth. Orang tua / Wali santri" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:border-primary outline-none"/>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1">Nomor WA Penjemput</label>
+          <input id="student-izin-wa" type="text" placeholder="cth. 08xxxxxxxxxx" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-sm focus:border-primary outline-none"/>
+        </div>
+      </div>
       <button onclick="submitStudentIzin()" class="w-full mt-3 bg-primary text-on-primary rounded-lg text-sm font-semibold py-2.5 hover:shadow-md transition-all">Kirim Permohonan Izin</button>
     </div>
     <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant">
@@ -7177,9 +7194,11 @@ async function submitStudentIzin(){
   const keperluan = document.getElementById("student-izin-keperluan").value.trim();
   const startDate = document.getElementById("student-izin-start").value;
   const endDate = document.getElementById("student-izin-end").value;
+  const jemput = document.getElementById("student-izin-jemput").value.trim();
+  const waPenjemput = document.getElementById("student-izin-wa").value.trim();
   if(!keperluan || !startDate || !endDate){ toast("Lengkapi keperluan dan rentang tanggal.", "error"); return; }
   if(new Date(endDate) < new Date(startDate)){ toast("Tanggal selesai tidak boleh sebelum tanggal mulai.", "error"); return; }
-  await addIzinRequest({ studentId: currentStudent.id, keperluan, startDate, endDate, requestedBy: currentStudent.name });
+  await addIzinRequest({ studentId: currentStudent.id, keperluan, startDate, endDate, requestedBy: currentStudent.name, jemput, waPenjemput });
   toast("Permohonan izin terkirim.");
   renderStudentIzin();
 }
